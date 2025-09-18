@@ -11,7 +11,7 @@ app.use(express.static("public"));
 
 const CPSC_ROOT = "https://www.saferproducts.gov/RestWebServices/Recall";
 
-/** Construye URL a CPSC con un solo campo (evita AND demasiado restrictivo). */
+
 function cpscUrl({ field, value, start, end }) {
   const params = new URLSearchParams({ format: "json" });
   if (value) params.append(field, value);
@@ -20,9 +20,9 @@ function cpscUrl({ field, value, start, end }) {
   return `${CPSC_ROOT}?${params.toString()}`;
 }
 
-/** Normaliza un registro de la CPSC a un objeto compacto. */
+
 function normalize(rec) {
-  // Campos planos
+  
   const {
     RecallID,
     RecallNumber,
@@ -57,7 +57,7 @@ function normalize(rec) {
   };
 }
 
-/** Búsqueda principal: hace hasta 3 consultas y fusiona (por id) */
+
 app.get("/api/recalls", async (req, res) => {
   const { q, start, end, limit = "20" } = req.query;
   const lim = Math.min(parseInt(limit || "20", 10), 100);
@@ -75,7 +75,7 @@ app.get("/api/recalls", async (req, res) => {
     for (const r of results) {
       if (r.status !== "fulfilled" || !Array.isArray(r.value.data)) continue;
       for (const rec of r.value.data) {
-        // Filtra “toy-like”
+       
         const products = (rec.Products || []);
         const isToy =
           products.some(p =>
@@ -88,7 +88,7 @@ app.get("/api/recalls", async (req, res) => {
       }
     }
 
-    // Ordena por fecha de publicación descendente
+    
     const ordered = [...merged.values()]
       .map(normalize)
       .sort(
@@ -102,7 +102,7 @@ app.get("/api/recalls", async (req, res) => {
   }
 });
 
-/** Resumen “IA” opcional (usa OpenAI o Gemini si configuras la key en .env). */
+
 app.post("/api/summarize", async (req, res) => {
   const { text, forAge } = req.body || {};
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -115,7 +115,7 @@ app.post("/api/summarize", async (req, res) => {
   try {
     let summary = "";
     if (OPENAI_API_KEY) {
-      // OpenAI Responses API (modelo económico)
+      
       const payload = {
         model: "gpt-4o-mini",
         input: [
