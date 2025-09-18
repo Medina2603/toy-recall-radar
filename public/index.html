@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Toy Recall Radar</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background:#0b0b0c; color:#e9ecef; }
+    h1 { margin-bottom: 8px; }
+    .bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    input, button { padding:10px 12px; border-radius:10px; border:1px solid #2a2a2e; background:#141419; color:#e9ecef; }
+    button { cursor:pointer; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:12px; }
+    .card { background:#15161a; border:1px solid #2a2a2e; border-radius:16px; padding:14px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+    .pill { font-size:12px; opacity:.8 }
+    .muted { color:#a9acb3 }
+    .row { display:flex; gap:10px; align-items:center; justify-content:space-between; }
+    .imgwrap img { width:100%; border-radius:12px; margin-top:8px; }
+    .bullets { white-space:pre-wrap; font-size:14px; }
+  </style>
+</head>
+<body>
+  <h1>🧸 Toy Recall Radar</h1>
+  <p class="muted">Busca retiros/alertas de juguetes y obtén riesgos y remedios directos de la CPSC.</p>
+  <div class="bar">
+    <input id="q" placeholder="palabra clave (p. ej. 'lego', 'doll')" />
+    <input id="start" type="date" />
+    <input id="end" type="date" />
+    <input id="limit" type="number" min="1" max="100" value="20" />
+    <button id="search">Buscar</button>
+  </div>
+
+  <div class="bar">
+    <input id="age" type="number" min="0" max="12" placeholder="edad del niño (opcional)" />
+    <button id="explain">Resumir riesgos (IA)</button>
+    <span class="muted">Requiere configurar una API key en el backend.</span>
+  </div>
+
+  <div id="list" class="grid"></div>
+
+<script>
+async function fetchRecalls() {
+  const q = document.getElementById('q').value.trim();
+  const start = document.getElementById('start').value;
+  const end = document.getElementById('end').value;
+  const limit = document.getElementById('limit').value || '20';
+  const url = new URL('/api/recalls', window.location.origin);
+  if (q) url.searchParams.set('q', q);
+  if (start) url.searchParams.set('start', start);
+  if (end) url.searchParams.set('end', end);
+  url.searchParams.set('limit', limit);
+
+  const r = await fetch(url);
+  const data = await r.json();
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+
+  for (const item of data.items) {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="row">
+        <strong>${item.title}</strong>
+        <span class="pill muted">${new Date(item.published).toLocaleDateString()}</span>
+      </div>
+      <div class="muted">${item.products?.map(p => p.name).filter(Boolean).join(' • ') || '—'}</div>
+      <p><strong>Peligro:</strong> ${item.hazard || '—'}</p>
+      <p><strong>Remedio:</strong> ${item.remedy || '—'}</p>
+      <a href="${item.url}" target="_blank" rel="noreferrer">Ver detalle oficial</a>
+      ${item.images?.[0] ? `<div class="imgwrap"><img src="${item.images[0]}" alt="product image"/></div>` : ''}
+      <details style="margin-top:8px;">
+        <summary class="muted">Descripción</summary>
+        <p>${item.description || '—'}</p>
+      </details>
+    `;
+    list.appendChild(div);
+  }
+}
+
+document.getElementById('search').addEventListener('click', fetchRecalls);
+window.addEventListener('load', fetchRecalls);
+
+document.getElementById('explain').addEventListener('click', async () => {
+  const cards = [...document.querySelectorAll('.card')].slice(0,1);
+  if (cards.length === 0) return alert('Primero realiza una búsqueda.');
+  const age = document.getElementById('age').value || '3';
+  const text = cards[0].innerText;
+  const r = await fetch('/api/summarize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, forAge: age })
+  });
+  const data = await r.json();
+  if (data.error) return alert(data.error);
+  const pre = document.createElement('pre');
+  pre.className = 'bullets';
+  pre.textContent = data.summary;
+  cards[0].appendChild(pre);
+});
+</script>
+</body>
+</html>
